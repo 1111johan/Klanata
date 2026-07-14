@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Amazon SP-API 库存控制台</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true"><i data-lucide="boxes"></i></div>
+        <div>
+          <strong>SP-API Console</strong>
+          <span>Inventory Feed</span>
+        </div>
+      </div>
+
+      <nav class="nav-list">
+        <button class="nav-item is-active" type="button" data-view-target="workspace" aria-current="page">
+          <i data-lucide="upload-cloud" aria-hidden="true"></i>
+          <span>上传工作台</span>
+        </button>
+        <button class="nav-item" type="button" data-view-target="jobs">
+          <i data-lucide="list-checks" aria-hidden="true"></i>
+          <span>任务记录</span>
+          <span class="nav-count" id="job-count">0</span>
+        </button>
+        <button class="nav-item" type="button" data-view-target="system">
+          <i data-lucide="server-cog" aria-hidden="true"></i>
+          <span>系统状态</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-status">
+        <span class="status-dot" id="server-dot" aria-hidden="true"></span>
+        <div>
+          <strong id="server-label">连接中</strong>
+          <span>127.0.0.1</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">库存 Feed 工作台</h1>
+          <p id="page-subtitle">JSON_LISTINGS_FEED · 加拿大站</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="environment-badge"><span class="status-dot is-live" aria-hidden="true"></span>Local only</span>
+          <button class="icon-button" id="refresh-button" type="button" aria-label="刷新当前页面" data-tooltip="刷新">
+            <i data-lucide="refresh-cw" aria-hidden="true"></i>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="view is-visible" id="view-workspace" data-view="workspace">
+          <div class="workflow-steps" aria-label="上传流程">
+            <div class="workflow-step is-active" data-workflow-step="file">
+              <span>1</span><div><strong>数据文件</strong><small id="step-file-status">待载入</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step" data-workflow-step="auth">
+              <span>2</span><div><strong>接口授权</strong><small id="step-auth-status">待验证</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step" data-workflow-step="account">
+              <span>3</span><div><strong>账户匹配</strong><small id="step-account-status">待验证</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step" data-workflow-step="submit">
+              <span>4</span><div><strong>提交 Feed</strong><small id="step-submit-status">未提交</small></div>
+            </div>
+          </div>
+
+          <section class="workspace-section" aria-labelledby="file-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">01</span>
+                <h2 id="file-heading">数据文件</h2>
+              </div>
+              <span class="section-state" id="file-state">未载入</span>
+            </div>
+
+            <div class="file-layout">
+              <div class="drop-zone" id="drop-zone">
+                <input class="sr-only" type="file" id="file-input" accept=".txt,.tsv,text/plain">
+                <div class="drop-icon" aria-hidden="true"><i data-lucide="file-spreadsheet"></i></div>
+                <strong id="drop-title">选择 Amazon 价格与库存模板</strong>
+                <span id="drop-meta">TXT / TSV</span>
+                <div class="button-row">
+                  <button class="button button-primary" type="button" id="choose-file-button">
+                    <i data-lucide="folder-open" aria-hidden="true"></i>选择文件
+                  </button>
+                  <button class="button" type="button" id="load-default-button">
+                    <i data-lucide="file-check-2" aria-hidden="true"></i>载入已收到文件
+                  </button>
+                </div>
+              </div>
+
+              <div class="file-summary" id="file-summary" aria-live="polite">
+                <div class="empty-state compact">
+                  <i data-lucide="scan-line" aria-hidden="true"></i>
+                  <span>等待数据校验</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="analysis-area is-hidden" id="analysis-area">
+              <div class="metric-grid">
+                <article class="metric-card">
+                  <span>唯一 SKU</span>
+                  <strong id="metric-skus">0</strong>
+                  <small id="metric-columns">0 列</small>
+                </article>
+                <article class="metric-card">
+                  <span>零库存</span>
+                  <strong id="metric-zero">0</strong>
+                  <small id="metric-zero-rate">0%</small>
+                </article>
+                <article class="metric-card">
+                  <span>有库存</span>
+                  <strong id="metric-positive">0</strong>
+                  <small id="metric-range">0–0</small>
+                </article>
+                <article class="metric-card">
+                  <span>库存合计</span>
+                  <strong id="metric-total">0</strong>
+                  <small>merchant fulfilled</small>
+                </article>
+              </div>
+
+              <div class="data-grid">
+                <div class="chart-panel">
+                  <div class="panel-heading">
+                    <h3>库存分布</h3>
+                    <span id="distribution-total">0 SKU</span>
+                  </div>
+                  <div class="bar-chart" id="distribution-chart" role="img" aria-label="库存数量分布"></div>
+                </div>
+
+                <div class="table-panel">
+                  <div class="panel-heading">
+                    <h3>数据预览</h3>
+                    <span id="preview-count">前 12 行</span>
+                  </div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead><tr><th>源行</th><th>SKU</th><th>渠道</th><th class="align-right">数量</th></tr></thead>
+                      <tbody id="preview-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-section" aria-labelledby="auth-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">02</span>
+                <h2 id="auth-heading">接口授权</h2>
+              </div>
+              <span class="section-state" id="auth-state">未验证</span>
+            </div>
+
+            <div class="region-control" aria-label="SP-API 区域">
+              <button type="button" class="segment is-selected" data-region="na" aria-pressed="true">北美</button>
+              <button type="button" class="segment" data-region="eu" aria-pressed="false">欧洲</button>
+              <button type="button" class="segment" data-region="fe" aria-pressed="false">远东</button>
+            </div>
+
+            <div class="form-grid three-columns">
+              <label class="field">
+                <span>Client identifier</span>
+                <input type="text" id="client-id" autocomplete="off" spellcheck="false" placeholder="amzn1.application-oa2-client…">
+              </label>
+              <label class="field">
+                <span>Client secret</span>
+                <span class="password-field">
+                  <input type="password" id="client-secret" autocomplete="new-password" spellcheck="false">
+                  <button type="button" class="field-icon" data-password-toggle="client-secret" aria-label="显示或隐藏 Client secret" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
+                </span>
+              </label>
+              <label class="field">
+                <span>Refresh token</span>
+                <span class="password-field">
+                  <input type="password" id="refresh-token" autocomplete="new-password" spellcheck="false">
+                  <button type="button" class="field-icon" data-password-toggle="refresh-token" aria-label="显示或隐藏 Refresh token" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
+                </span>
+              </label>
+            </div>
+
+            <div class="action-strip">
+              <div class="inline-status" id="auth-result">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>等待授权验证</span>
+              </div>
+              <button class="button button-primary" type="button" id="verify-auth-button">
+                <i data-lucide="shield-check" aria-hidden="true"></i>验证授权
+              </button>
+            </div>
+          </section>
+
+          <section class="workspace-section" aria-labelledby="account-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">03</span>
+                <h2 id="account-heading">账户匹配</h2>
+              </div>
+              <span class="section-state" id="account-state">未验证</span>
+            </div>
+
+            <div class="form-grid account-grid">
+              <label class="field">
+                <span>Seller ID</span>
+                <input type="text" id="seller-id" autocomplete="off" spellcheck="false" placeholder="A1XXXXXXXXXXXXX">
+              </label>
+              <label class="field">
+                <span>目标 Marketplace</span>
+                <select id="marketplace-select" disabled>
+                  <option value="">先验证接口授权</option>
+                </select>
+              </label>
+              <div class="field action-field">
+                <span>Validation preview</span>
+                <button class="button" type="button" id="validate-account-button" disabled>
+                  <i data-lucide="badge-check" aria-hidden="true"></i>验证账户匹配
+                </button>
+              </div>
+            </div>
+
+            <div class="account-result" id="account-result">
+              <div class="empty-state compact">
+                <i data-lucide="link-2" aria-hidden="true"></i>
+                <span>等待 Seller ID 与授权账户匹配</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-section submit-section" aria-labelledby="submit-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">04</span>
+                <h2 id="submit-heading">提交 Feed</h2>
+              </div>
+              <span class="section-state" id="submit-state">未就绪</span>
+            </div>
+
+            <div class="submit-grid">
+              <dl class="review-list">
+                <div><dt>店铺</dt><dd id="review-store">—</dd></div>
+                <div><dt>Marketplace</dt><dd id="review-marketplace">—</dd></div>
+                <div><dt>Seller ID</dt><dd id="review-seller">—</dd></div>
+                <div><dt>SKU 数量</dt><dd id="review-rows">—</dd></div>
+                <div><dt>零库存更新</dt><dd id="review-zero">—</dd></div>
+                <div><dt>Feed 类型</dt><dd>JSON_LISTINGS_FEED</dd></div>
+              </dl>
+
+              <div class="confirmation-panel">
+                <label class="check-row">
+                  <input type="checkbox" id="confirm-checkbox">
+                  <span>目标账户、Marketplace 和库存数据已核对</span>
+                </label>
+                <label class="field">
+                  <span>输入 SUBMIT</span>
+                  <input type="text" id="confirmation-input" autocomplete="off" spellcheck="false">
+                </label>
+                <button class="button button-danger button-block" type="button" id="submit-feed-button" disabled>
+                  <i data-lucide="send" aria-hidden="true"></i>提交库存 Feed
+                </button>
+                <div class="submit-message" id="submit-message" aria-live="polite"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-jobs" data-view="jobs">
+          <section class="workspace-section no-top-border" aria-labelledby="jobs-heading">
+            <div class="section-heading">
+              <div><span class="section-index">LOG</span><h2 id="jobs-heading">任务记录</h2></div>
+              <button class="button" type="button" id="refresh-jobs-button"><i data-lucide="refresh-cw" aria-hidden="true"></i>刷新</button>
+            </div>
+
+            <div class="jobs-layout">
+              <div class="table-panel jobs-table-panel">
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>创建时间</th><th>Feed ID</th><th>Marketplace</th><th class="align-right">SKU</th><th>状态</th></tr></thead>
+                    <tbody id="jobs-body"></tbody>
+                  </table>
+                </div>
+                <div class="empty-state" id="jobs-empty">
+                  <i data-lucide="inbox" aria-hidden="true"></i>
+                  <span>暂无提交任务</span>
+                </div>
+              </div>
+
+              <aside class="job-detail" id="job-detail" aria-label="任务详情">
+                <div class="empty-state">
+                  <i data-lucide="mouse-pointer-click" aria-hidden="true"></i>
+                  <span>选择任务查看处理状态</span>
+                </div>
+              </aside>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-system" data-view="system">
+          <section class="workspace-section no-top-border" aria-labelledby="system-heading">
+            <div class="section-heading">
+              <div><span class="section-index">SYS</span><h2 id="system-heading">系统状态</h2></div>
+              <span class="section-state" id="system-health">检查中</span>
+            </div>
+
+            <div class="system-grid">
+              <div class="system-row"><span>服务地址</span><code id="system-bind">—</code><strong id="system-bind-status">—</strong></div>
+              <div class="system-row"><span>凭证存储</span><code id="system-credentials">—</code><strong>不写入磁盘</strong></div>
+              <div class="system-row"><span>示例文件</span><code id="system-default-file">—</code><strong id="system-file-status">—</strong></div>
+              <div class="system-row"><span>Feeds API</span><code>/feeds/2021-06-30</code><strong>JSON_LISTINGS_FEED</strong></div>
+              <div class="system-row"><span>Listings API</span><code>/listings/2021-08-01</code><strong>VALIDATION_PREVIEW</strong></div>
+              <div class="system-row"><span>版本</span><code id="system-version">—</code><strong>PowerShell local server</strong></div>
+            </div>
+
+            <div class="endpoint-table">
+              <div><span>北美</span><code>sellingpartnerapi-na.amazon.com</code></div>
+              <div><span>欧洲</span><code>sellingpartnerapi-eu.amazon.com</code></div>
+              <div><span>远东</span><code>sellingpartnerapi-fe.amazon.com</code></div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="submit-dialog" class="submit-dialog">
+    <form method="dialog">
+      <div class="dialog-icon" aria-hidden="true"><i data-lucide="triangle-alert"></i></div>
+      <h2>确认提交库存 Feed</h2>
+      <dl class="dialog-summary">
+        <div><dt>店铺</dt><dd id="dialog-store">—</dd></div>
+        <div><dt>Marketplace</dt><dd id="dialog-marketplace">—</dd></div>
+        <div><dt>SKU</dt><dd id="dialog-rows">—</dd></div>
+      </dl>
+      <div class="dialog-actions">
+        <button class="button" value="cancel">取消</button>
+        <button class="button button-danger" type="button" id="confirm-submit-button"><i data-lucide="send" aria-hidden="true"></i>确认提交</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+  <script src="/vendor/lucide.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

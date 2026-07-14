@@ -1,0 +1,13 @@
+runtime/
+.env
+.env.*
+*.secret
+*.secrets
+credentials.json
+secrets.json
+PriceAndQuantity-*.txt
+*-json-listings-feed.json
+feed-input-*.json
+feed-processing-report-*.json
+server.json
+*.download
