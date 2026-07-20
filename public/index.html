@@ -3,96 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Klanata Amazon SP-API 库存、Feed 与智能调价运营工作站">
   <meta name="color-scheme" content="light">
-  <title>Amazon SP-API 库存控制台</title>
+  <meta name="theme-color" content="#10272a">
+  <title>Klanata · Amazon Operations</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="is-booting">
+  <a class="skip-link" href="#main-content">跳转至主内容</a>
   <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand-block">
         <div class="brand-mark" aria-hidden="true"><i data-lucide="boxes"></i></div>
-        <div>
-          <strong>SP-API Console</strong>
-          <span>Inventory Feed</span>
+        <div class="brand-copy">
+          <strong>Klanata</strong>
+          <span>Amazon Operations</span>
         </div>
       </div>
 
-      <nav class="nav-list">
-        <button class="nav-item is-active" type="button" data-view-target="workspace" aria-current="page">
+      <nav class="nav-list" aria-label="工作区">
+        <a class="nav-item is-active" href="#workspace" data-view-target="workspace" aria-controls="view-workspace" aria-current="page">
           <i data-lucide="upload-cloud" aria-hidden="true"></i>
-          <span>上传工作台</span>
-        </button>
-        <button class="nav-item" type="button" data-view-target="jobs">
+          <span>商品上传</span>
+        </a>
+        <a class="nav-item" id="legacy-pricing-nav" href="#pricing" data-view-target="pricing" aria-controls="view-pricing">
+          <i data-lucide="badge-dollar-sign" aria-hidden="true"></i>
+          <span>应急调价模拟</span>
+        </a>
+        <a class="nav-item" href="#jobs" data-view-target="jobs" aria-controls="view-jobs">
           <i data-lucide="list-checks" aria-hidden="true"></i>
           <span>任务记录</span>
           <span class="nav-count" id="job-count">0</span>
-        </button>
-        <button class="nav-item" type="button" data-view-target="system">
-          <i data-lucide="server-cog" aria-hidden="true"></i>
-          <span>系统状态</span>
-        </button>
+        </a>
+        <a class="nav-item" href="#settings" data-view-target="settings" aria-controls="view-settings">
+          <i data-lucide="settings-2" aria-hidden="true"></i>
+          <span>设置</span>
+        </a>
       </nav>
 
       <div class="sidebar-status">
         <span class="status-dot" id="server-dot" aria-hidden="true"></span>
         <div>
           <strong id="server-label">连接中</strong>
-          <span>127.0.0.1</span>
+          <span id="server-host">正在识别服务地址</span>
         </div>
       </div>
     </aside>
 
     <div class="app-main">
       <header class="topbar">
-        <div>
-          <h1 id="page-title">库存 Feed 工作台</h1>
-          <p id="page-subtitle">JSON_LISTINGS_FEED · 加拿大站</p>
+        <div class="topbar-copy">
+          <span class="page-kicker" id="page-kicker">AMAZON OPERATIONS</span>
+          <h1 id="page-title">商品上传</h1>
+          <p class="is-hidden" id="page-subtitle"></p>
         </div>
         <div class="topbar-actions">
-          <span class="environment-badge"><span class="status-dot is-live" aria-hidden="true"></span>Local only</span>
+          <span class="target-badge" id="target-badge" title="当前 Feed 目标">
+            <i data-lucide="store" aria-hidden="true"></i>
+            <span id="target-summary" aria-live="polite">未选择目标店铺</span>
+          </span>
+          <span class="environment-badge">
+            <span class="status-dot is-live" aria-hidden="true"></span>
+            <span id="environment-label">生产环境</span>
+          </span>
           <button class="icon-button" id="refresh-button" type="button" aria-label="刷新当前页面" data-tooltip="刷新">
             <i data-lucide="refresh-cw" aria-hidden="true"></i>
           </button>
         </div>
       </header>
 
-      <main>
+      <main id="main-content" tabindex="-1" aria-busy="true">
         <section class="view is-visible" id="view-workspace" data-view="workspace">
-          <div class="workflow-steps" aria-label="上传流程">
-            <div class="workflow-step is-active" data-workflow-step="file">
+          <div class="workflow-steps upload-workflow" role="group" aria-label="上传流程">
+            <button class="workflow-step is-active" type="button" data-workflow-step="file" data-flow-jump="file">
               <span>1</span><div><strong>数据文件</strong><small id="step-file-status">待载入</small></div>
-            </div>
+            </button>
             <div class="workflow-line" aria-hidden="true"></div>
-            <div class="workflow-step" data-workflow-step="auth">
-              <span>2</span><div><strong>接口授权</strong><small id="step-auth-status">待验证</small></div>
-            </div>
+            <button class="workflow-step" type="button" data-workflow-step="account" data-flow-jump="account">
+              <span>2</span><div><strong>Carkee 站点</strong><small id="step-account-status">待选择</small></div>
+            </button>
             <div class="workflow-line" aria-hidden="true"></div>
-            <div class="workflow-step" data-workflow-step="account">
-              <span>3</span><div><strong>账户匹配</strong><small id="step-account-status">待验证</small></div>
-            </div>
-            <div class="workflow-line" aria-hidden="true"></div>
-            <div class="workflow-step" data-workflow-step="submit">
-              <span>4</span><div><strong>提交 Feed</strong><small id="step-submit-status">未提交</small></div>
-            </div>
+            <button class="workflow-step" type="button" data-workflow-step="submit" data-flow-jump="submit">
+              <span>3</span><div><strong>提交 Feed</strong><small id="step-submit-status">未提交</small></div>
+            </button>
           </div>
 
-          <section class="workspace-section" aria-labelledby="file-heading">
+          <section class="workspace-section flow-panel" id="flow-panel-file" data-flow-panel="file" aria-labelledby="file-heading">
             <div class="section-heading">
               <div>
                 <span class="section-index">01</span>
                 <h2 id="file-heading">数据文件</h2>
               </div>
-              <span class="section-state" id="file-state">未载入</span>
+              <div class="flow-panel-actions">
+                <span class="section-state" id="file-state">未载入</span>
+                <button class="icon-button flow-panel-toggle" type="button" data-flow-toggle="file" aria-label="展开数据文件" data-tooltip="展开或收起" aria-expanded="true">
+                  <i data-lucide="chevron-down" aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
 
             <div class="file-layout">
               <div class="drop-zone" id="drop-zone">
-                <input class="sr-only" type="file" id="file-input" accept=".txt,.tsv,text/plain">
+                <input class="sr-only" type="file" id="file-input" name="inventory-template" aria-label="选择 Amazon 价格与库存模板" accept=".txt,.tsv,.xlsx,.xlsm,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12">
                 <div class="drop-icon" aria-hidden="true"><i data-lucide="file-spreadsheet"></i></div>
                 <strong id="drop-title">选择 Amazon 价格与库存模板</strong>
-                <span id="drop-meta">TXT / TSV</span>
+                <span id="drop-meta">TXT / TSV / XLSX / XLSM</span>
                 <div class="button-row">
                   <button class="button button-primary" type="button" id="choose-file-button">
                     <i data-lucide="folder-open" aria-hidden="true"></i>选择文件
@@ -110,6 +126,12 @@
                 </div>
               </div>
             </div>
+
+            <button class="detail-toggle is-hidden" type="button" id="analysis-toggle" aria-expanded="false" aria-controls="analysis-area">
+              <i data-lucide="chart-no-axes-column-increasing" aria-hidden="true"></i>
+              <span>查看数据详情</span>
+              <i data-lucide="chevron-down" aria-hidden="true"></i>
+            </button>
 
             <div class="analysis-area is-hidden" id="analysis-area">
               <div class="metric-grid">
@@ -160,122 +182,385 @@
             </div>
           </section>
 
-          <section class="workspace-section" aria-labelledby="auth-heading">
+          <section class="workspace-section flow-panel" id="flow-panel-auth" data-flow-panel="auth" aria-labelledby="auth-heading">
+            <div class="section-heading">
+              <div>
+                <span class="section-index">账户</span>
+                <h2 id="auth-heading">Carkee 店铺授权</h2>
+              </div>
+              <div class="flow-panel-actions">
+                <span class="section-state" id="auth-state">检查中</span>
+              </div>
+            </div>
+
+            <div class="oauth-connect-panel">
+              <div class="oauth-connect-copy">
+                <span class="oauth-connect-icon" aria-hidden="true"><i data-lucide="store"></i></span>
+                <div>
+                  <span>Carkee 授权账户</span>
+                  <strong id="oauth-connect-title">正在读取连接状态</strong>
+                  <small id="oauth-connect-detail">授权后自动绑定 Carkee 并发现可销售站点</small>
+                </div>
+              </div>
+              <button class="button button-primary oauth-connect-button" type="button" id="oauth-auth-button">
+                <i data-lucide="external-link" aria-hidden="true"></i><span id="oauth-auth-button-label">连接 Carkee</span>
+              </button>
+            </div>
+
+            <div class="inline-status settings-auth-result" id="auth-result" aria-live="polite" hidden>
+              <span class="status-dot" aria-hidden="true"></span>
+              <span>等待 Carkee 店铺授权</span>
+            </div>
+
+            <div class="authorized-accounts" id="authorized-accounts">
+              <div class="empty-state compact">
+                <i data-lucide="store" aria-hidden="true"></i>
+                <span>尚未连接 Carkee</span>
+              </div>
+            </div>
+
+            <details class="advanced-settings admin-auth-settings" id="admin-application-settings">
+              <summary><i data-lucide="key-round" aria-hidden="true"></i><span>管理员应用配置</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary>
+              <div class="developer-app-strip" id="developer-app-strip">
+                <div>
+                  <span>开发者应用状态</span>
+                  <strong id="developer-app-status">检查中</strong>
+                </div>
+                <code id="developer-app-client">—</code>
+                <span class="status-badge" id="developer-app-secret">未配置</span>
+              </div>
+              <div class="form-grid two-columns admin-application-grid">
+                <label class="field">
+                  <span>Amazon Application ID</span>
+                  <input type="text" id="application-id" name="application-id" autocomplete="off" spellcheck="false" placeholder="amzn1.sellerapps.app...">
+                </label>
+                <label class="field">
+                  <span>LWA Client ID</span>
+                  <input type="text" id="client-id" name="client-id" autocomplete="off" spellcheck="false" placeholder="amzn1.application-oa2-client...">
+                </label>
+                <div class="field">
+                  <label for="client-secret">LWA Client Secret</label>
+                  <span class="password-field">
+                    <input type="password" id="client-secret" name="client-secret" autocomplete="new-password" spellcheck="false" placeholder="已配置时留空可保留原密钥">
+                    <button type="button" class="field-icon" data-password-toggle="client-secret" aria-label="显示或隐藏 Client secret" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
+                  </span>
+                </div>
+                <label class="field">
+                  <span>Amazon 授权地址</span>
+                  <input type="url" id="authorization-base-uri" name="authorization-base-uri" autocomplete="url" spellcheck="false" placeholder="https://sellercentral.amazon.com/apps/authorize/consent">
+                </label>
+              </div>
+              <div class="admin-settings-actions">
+                <div class="inline-status" id="application-result" aria-live="polite">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span>仅管理员需要维护，日常运营不会显示这些字段</span>
+                </div>
+                <button class="button" type="button" id="save-application-button">
+                  <i data-lucide="save" aria-hidden="true"></i>保存应用配置
+                </button>
+              </div>
+            </details>
+
+            <details class="advanced-settings legacy-auth-settings">
+              <summary><i data-lucide="archive-restore" aria-hidden="true"></i><span>旧授权迁移与修复</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary>
+              <div class="legacy-auth-copy">
+                <strong>仅处理 Carkee 没有完成 OAuth 绑定的历史授权</strong>
+                <span>补录一次后，店铺和站点会自动保存，日常操作无需再次填写。</span>
+              </div>
+              <div class="form-grid auth-account-grid">
+                <label class="field">
+                  <span>Seller ID</span>
+                  <input type="text" id="auth-seller-id" name="auth-seller-id" autocomplete="off" spellcheck="false" placeholder="例如 A1XXXXXXXXXXXXX">
+                </label>
+                <label class="field auth-token-field">
+                  <span>Refresh Token</span>
+                  <span class="password-field">
+                    <input type="password" id="refresh-token" name="refresh-token" autocomplete="new-password" spellcheck="false" placeholder="粘贴历史 Refresh Token">
+                    <button type="button" class="field-icon" data-password-toggle="refresh-token" aria-label="显示或隐藏 Refresh token" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
+                  </span>
+                </label>
+              </div>
+              <div class="action-strip legacy-auth-action" aria-live="polite">
+                <div class="inline-status" id="legacy-auth-result">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span>仅用于旧数据迁移</span>
+                </div>
+                <button class="button" type="button" id="verify-auth-button">
+                  <i data-lucide="wrench" aria-hidden="true"></i>迁移旧授权
+                </button>
+              </div>
+            </details>
+          </section>
+
+          <section class="workspace-section flow-panel target-section" id="flow-panel-account" data-flow-panel="account" aria-labelledby="account-heading">
             <div class="section-heading">
               <div>
                 <span class="section-index">02</span>
-                <h2 id="auth-heading">接口授权</h2>
+                <h2 id="account-heading">Carkee 站点</h2>
               </div>
-              <span class="section-state" id="auth-state">未验证</span>
-            </div>
-
-            <div class="region-control" aria-label="SP-API 区域">
-              <button type="button" class="segment is-selected" data-region="na" aria-pressed="true">北美</button>
-              <button type="button" class="segment" data-region="eu" aria-pressed="false">欧洲</button>
-              <button type="button" class="segment" data-region="fe" aria-pressed="false">远东</button>
-            </div>
-
-            <div class="form-grid three-columns">
-              <label class="field">
-                <span>Client identifier</span>
-                <input type="text" id="client-id" autocomplete="off" spellcheck="false" placeholder="amzn1.application-oa2-client…">
-              </label>
-              <label class="field">
-                <span>Client secret</span>
-                <span class="password-field">
-                  <input type="password" id="client-secret" autocomplete="new-password" spellcheck="false">
-                  <button type="button" class="field-icon" data-password-toggle="client-secret" aria-label="显示或隐藏 Client secret" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
-                </span>
-              </label>
-              <label class="field">
-                <span>Refresh token</span>
-                <span class="password-field">
-                  <input type="password" id="refresh-token" autocomplete="new-password" spellcheck="false">
-                  <button type="button" class="field-icon" data-password-toggle="refresh-token" aria-label="显示或隐藏 Refresh token" data-tooltip="显示或隐藏"><i data-lucide="eye"></i></button>
-                </span>
-              </label>
-            </div>
-
-            <div class="action-strip">
-              <div class="inline-status" id="auth-result">
-                <span class="status-dot" aria-hidden="true"></span>
-                <span>等待授权验证</span>
-              </div>
-              <button class="button button-primary" type="button" id="verify-auth-button">
-                <i data-lucide="shield-check" aria-hidden="true"></i>验证授权
-              </button>
-            </div>
-          </section>
-
-          <section class="workspace-section" aria-labelledby="account-heading">
-            <div class="section-heading">
-              <div>
-                <span class="section-index">03</span>
-                <h2 id="account-heading">账户匹配</h2>
-              </div>
-              <span class="section-state" id="account-state">未验证</span>
-            </div>
-
-            <div class="form-grid account-grid">
-              <label class="field">
-                <span>Seller ID</span>
-                <input type="text" id="seller-id" autocomplete="off" spellcheck="false" placeholder="A1XXXXXXXXXXXXX">
-              </label>
-              <label class="field">
-                <span>目标 Marketplace</span>
-                <select id="marketplace-select" disabled>
-                  <option value="">先验证接口授权</option>
-                </select>
-              </label>
-              <div class="field action-field">
-                <span>Validation preview</span>
-                <button class="button" type="button" id="validate-account-button" disabled>
-                  <i data-lucide="badge-check" aria-hidden="true"></i>验证账户匹配
+              <div class="flow-panel-actions">
+                <span class="section-state" id="account-state">未验证</span>
+                <button class="icon-button flow-panel-toggle" type="button" data-flow-toggle="account" aria-label="展开目标检查" data-tooltip="展开或收起" aria-expanded="false">
+                  <i data-lucide="chevron-down" aria-hidden="true"></i>
                 </button>
+              </div>
+            </div>
+
+            <div class="target-picker">
+              <input type="hidden" id="seller-id" name="seller-id">
+              <label class="field target-marketplace-field">
+                <span>目标 Carkee 站点</span>
+                <select id="marketplace-select" name="marketplace" autocomplete="off" disabled>
+                  <option value="">先到设置连接 Carkee</option>
+                </select>
+                <small>账户绑定和提交授权由系统自动带入。</small>
+              </label>
+              <div class="target-picker-actions">
+                <a class="button" href="#settings" data-open-settings>
+                  <i data-lucide="settings-2" aria-hidden="true"></i>管理 Carkee
+                </a>
               </div>
             </div>
 
             <div class="account-result" id="account-result">
               <div class="empty-state compact">
                 <i data-lucide="link-2" aria-hidden="true"></i>
-                <span>等待 Seller ID 与授权账户匹配</span>
+                <span>选择 Carkee 站点后，系统会自动检查文件归属</span>
               </div>
             </div>
           </section>
 
-          <section class="workspace-section submit-section" aria-labelledby="submit-heading">
+          <section class="workspace-section submit-section flow-panel" id="flow-panel-submit" data-flow-panel="submit" aria-labelledby="submit-heading">
             <div class="section-heading">
               <div>
-                <span class="section-index">04</span>
+                <span class="section-index">03</span>
                 <h2 id="submit-heading">提交 Feed</h2>
               </div>
-              <span class="section-state" id="submit-state">未就绪</span>
+              <div class="section-heading-actions">
+                <span class="section-context" id="submit-context">JSON_LISTINGS_FEED · 目标站点</span>
+                <span class="section-state" id="submit-state">未就绪</span>
+                <button class="icon-button flow-panel-toggle" type="button" data-flow-toggle="submit" aria-label="展开提交 Feed" data-tooltip="展开或收起" aria-expanded="false">
+                  <i data-lucide="chevron-down" aria-hidden="true"></i>
+                </button>
+              </div>
             </div>
 
             <div class="submit-grid">
-              <dl class="review-list">
-                <div><dt>店铺</dt><dd id="review-store">—</dd></div>
-                <div><dt>Marketplace</dt><dd id="review-marketplace">—</dd></div>
-                <div><dt>Seller ID</dt><dd id="review-seller">—</dd></div>
-                <div><dt>SKU 数量</dt><dd id="review-rows">—</dd></div>
-                <div><dt>零库存更新</dt><dd id="review-zero">—</dd></div>
-                <div><dt>Feed 类型</dt><dd>JSON_LISTINGS_FEED</dd></div>
-              </dl>
+              <details class="review-disclosure">
+                <summary>
+                  <span><i data-lucide="scan-text" aria-hidden="true"></i>目标与变更</span>
+                  <strong id="review-compact">等待目标检查</strong>
+                  <i data-lucide="chevron-down" aria-hidden="true"></i>
+                </summary>
+                <dl class="review-list">
+                  <div><dt>店铺</dt><dd id="review-store">—</dd></div>
+                  <div><dt>站点</dt><dd id="review-marketplace">—</dd></div>
+                  <div><dt>账户绑定</dt><dd id="review-seller">—</dd></div>
+                  <div><dt>SKU 数量</dt><dd id="review-rows">—</dd></div>
+                  <div><dt>零库存更新</dt><dd id="review-zero">—</dd></div>
+                  <div><dt>Feed 类型</dt><dd>JSON_LISTINGS_FEED</dd></div>
+                </dl>
+              </details>
 
               <div class="confirmation-panel">
-                <label class="check-row">
-                  <input type="checkbox" id="confirm-checkbox">
-                  <span>目标账户、Marketplace 和库存数据已核对</span>
+                <div class="submission-risk is-hidden" id="submission-risk" role="status">
+                  <i data-lucide="triangle-alert" aria-hidden="true"></i>
+                  <span id="submission-risk-text"></span>
+                </div>
+                <label class="field submission-auth-field is-hidden">
+                  <span>提交授权</span>
+                  <select id="submission-auth-select" name="submission-authorization" disabled>
+                    <option value="">先完成目标检查</option>
+                  </select>
+                  <small id="submission-auth-detail">同一店铺可保留多个已验证授权</small>
                 </label>
-                <label class="field">
-                  <span>输入 SUBMIT</span>
-                  <input type="text" id="confirmation-input" autocomplete="off" spellcheck="false">
+                <label class="check-row">
+                  <input type="checkbox" id="confirm-checkbox" name="confirm-target">
+                  <span>我已核对上方店铺、站点和库存变更</span>
+                </label>
+                <label class="field submission-phrase-field is-hidden">
+                  <span id="confirmation-label">输入 SUBMIT</span>
+                  <input type="text" id="confirmation-input" name="confirmation" autocomplete="off" spellcheck="false" placeholder="SUBMIT">
                 </label>
                 <button class="button button-danger button-block" type="button" id="submit-feed-button" disabled>
                   <i data-lucide="send" aria-hidden="true"></i>提交库存 Feed
                 </button>
                 <div class="submit-message" id="submit-message" aria-live="polite"></div>
               </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-pricing" data-view="pricing">
+          <div class="workflow-steps pricing-workflow" role="list" aria-label="管理员应急调价模拟流程">
+            <div class="workflow-step is-active" role="listitem" data-pricing-step="source">
+              <span>1</span><div><strong>Listing 快照</strong><small id="pricing-step-source">待导入</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step" role="listitem" data-pricing-step="filter">
+              <span>2</span><div><strong>纯 FBM 筛选</strong><small id="pricing-step-filter">待运行</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step" role="listitem" data-pricing-step="rule">
+              <span>3</span><div><strong>规则模拟</strong><small id="pricing-step-rule">待运行</small></div>
+            </div>
+            <div class="workflow-line" aria-hidden="true"></div>
+            <div class="workflow-step is-error" role="listitem" data-pricing-step="gate">
+              <span>4</span><div><strong>只读结果</strong><small>V4 执行</small></div>
+            </div>
+          </div>
+
+          <section class="workspace-section" aria-labelledby="pricing-source-heading">
+            <div class="section-heading">
+              <div><span class="section-index">01</span><h2 id="pricing-source-heading">管理员应急数据源</h2></div>
+              <span class="section-state" id="pricing-source-state">未载入</span>
+            </div>
+
+            <div class="pricing-source-grid">
+              <div class="pricing-source-fields">
+                <label class="field">
+                  <span>目标 Carkee 站点</span>
+                  <select id="pricing-marketplace-select" name="pricing-marketplace" autocomplete="off" disabled>
+                    <option value="">先在商品上传完成授权验证</option>
+                  </select>
+                </label>
+                <div class="pricing-file-control">
+                  <input class="sr-only" type="file" id="pricing-file-input" name="pricing-snapshot" aria-label="选择 Listing 或赛狐快照" accept=".csv,.txt,.tsv,.xlsx,.xlsm,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12">
+                  <div>
+                    <span>历史 Listing / 赛狐快照</span>
+                    <strong id="pricing-file-name">尚未选择文件</strong>
+                    <small>CSV / TXT / TSV / XLSX / XLSM</small>
+                  </div>
+                  <button class="button" type="button" id="pricing-choose-file-button">
+                    <i data-lucide="file-up" aria-hidden="true"></i>选择快照
+                  </button>
+                </div>
+              </div>
+
+              <div class="pricing-gate" role="status">
+                <i data-lucide="shield-alert" aria-hidden="true"></i>
+                <div>
+                  <strong>旧版仅允许只读模拟</strong>
+                  <span>此文件流程仅供本机管理员应急核对，不创建审批批次、不提交 Amazon；正式调价由 V4 API 原生流程执行。</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace-section" aria-labelledby="pricing-rule-heading">
+            <div class="section-heading">
+              <div><span class="section-index">02</span><h2 id="pricing-rule-heading">应急模拟规则</h2></div>
+              <span class="section-state is-warning" id="pricing-rule-state">仅模拟</span>
+            </div>
+
+            <div class="pricing-quick-controls">
+              <div class="pricing-direction" aria-label="调价方向">
+                <button type="button" class="segment is-selected" data-pricing-direction="UP" aria-pressed="true">
+                  <i data-lucide="trending-up" aria-hidden="true"></i>上涨
+                </button>
+                <button type="button" class="segment" data-pricing-direction="DOWN" aria-pressed="false">
+                  <i data-lucide="trending-down" aria-hidden="true"></i>下降
+                </button>
+              </div>
+              <div class="pricing-presets" aria-label="调价预设">
+                <button type="button" class="segment" data-pricing-preset="conservative">保守</button>
+                <button type="button" class="segment is-selected" data-pricing-preset="standard">标准</button>
+                <button type="button" class="segment" data-pricing-preset="aggressive">积极</button>
+              </div>
+            </div>
+
+            <details class="advanced-settings pricing-advanced-settings">
+              <summary><i data-lucide="sliders-horizontal" aria-hidden="true"></i><span>高级规则</span><i data-lucide="chevron-down" aria-hidden="true"></i></summary>
+              <div class="pricing-rule-grid">
+              <label class="field">
+                <span>分段阈值</span>
+                <span class="input-unit"><input type="number" id="pricing-threshold" name="pricing-threshold" inputmode="decimal" value="100" min="0.01" step="0.01"><small>价格</small></span>
+              </label>
+              <label class="field">
+                <span>价格 ≤ 阈值</span>
+                <select id="pricing-lower-mode" name="pricing-lower-mode"><option value="FIXED_AMOUNT">固定金额</option><option value="PERCENTAGE">百分比</option></select>
+              </label>
+              <label class="field">
+                <span>低价段幅度</span>
+                <input type="number" id="pricing-lower-value" name="pricing-lower-value" inputmode="decimal" value="0.50" min="0.01" step="0.01">
+              </label>
+              <label class="field">
+                <span>价格 &gt; 阈值</span>
+                <select id="pricing-upper-mode" name="pricing-upper-mode"><option value="PERCENTAGE">百分比</option><option value="FIXED_AMOUNT">固定金额</option></select>
+              </label>
+              <label class="field">
+                <span>高价段幅度</span>
+                <input type="number" id="pricing-upper-value" name="pricing-upper-value" inputmode="decimal" value="0.50" min="0.01" step="0.01">
+              </label>
+              <label class="field">
+                <span>最大绝对变化</span>
+                <input type="number" id="pricing-max-change" name="pricing-max-change" inputmode="decimal" value="0.90" min="0.01" step="0.01">
+              </label>
+              <label class="field pricing-business-field">
+                <span>企业价策略</span>
+                <select id="pricing-business-mode" name="pricing-business-mode">
+                  <option value="DO_NOT_CHANGE" selected>不修改企业价（默认）</option>
+                  <option value="PRESERVE_DISCOUNT_RATIO">保持原折扣比例</option>
+                  <option value="SAME_ABSOLUTE_DELTA">与普通价同额变化</option>
+                  <option value="SAME_PERCENTAGE">与普通价同比例变化</option>
+                </select>
+              </label>
+              </div>
+            </details>
+
+            <div class="action-strip" aria-live="polite">
+              <div class="inline-status" id="pricing-simulation-status">
+                <span class="status-dot" aria-hidden="true"></span><span>等待已授权站点、数据文件和规则</span>
+              </div>
+              <button class="button button-primary" type="button" id="pricing-run-button" disabled>
+                <i data-lucide="calculator" aria-hidden="true"></i>运行安全模拟
+              </button>
+            </div>
+          </section>
+
+          <section class="workspace-section is-hidden" id="pricing-results" aria-labelledby="pricing-results-heading">
+            <div class="section-heading">
+              <div><span class="section-index">03</span><h2 id="pricing-results-heading">筛选与差异预览</h2></div>
+              <div class="section-heading-actions">
+                <button class="button" type="button" id="pricing-export-button"><i data-lucide="download" aria-hidden="true"></i>导出差异 CSV</button>
+                <button class="button button-primary is-hidden" type="button" id="pricing-approval-button" disabled><i data-lucide="lock-keyhole" aria-hidden="true"></i>V4_REQUIRED</button>
+              </div>
+            </div>
+
+            <div class="metric-grid pricing-metric-grid">
+              <article class="metric-card"><span>导入记录</span><strong id="pricing-total">0</strong><small id="pricing-file-summary">—</small></article>
+              <article class="metric-card"><span>可调价候选</span><strong id="pricing-eligible">0</strong><small>在线可售纯 FBM</small></article>
+              <article class="metric-card"><span>已排除</span><strong id="pricing-excluded">0</strong><small>逐条保留原因</small></article>
+              <article class="metric-card"><span>批次风险</span><strong id="pricing-risk">—</strong><small id="pricing-scope-summary">—</small></article>
+            </div>
+
+            <div class="pricing-results-grid">
+              <div class="pricing-exclusion-panel">
+                <div class="panel-heading"><h3>排除原因</h3><span id="pricing-exclusion-count">0 条</span></div>
+                <div class="exclusion-list" id="pricing-exclusion-list"></div>
+              </div>
+              <div class="table-panel pricing-preview-panel">
+                <div class="panel-heading"><h3>价格差异</h3><span id="pricing-preview-count">0 条候选</span></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>SKU / ASIN</th><th class="align-right">当前价</th><th class="align-right">新价格</th><th class="align-right">变化</th><th class="align-right">企业价</th><th>风险</th></tr></thead>
+                    <tbody id="pricing-preview-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="pricing-lock-banner">
+              <i data-lucide="lock-keyhole" aria-hidden="true"></i>
+              <span id="pricing-gate-message">旧版文件流程只生成只读差异；生产调价请进入 V4 API 原生流程。</span>
+            </div>
+
+            <div class="pricing-production-strip is-hidden" id="pricing-production-strip" aria-live="polite">
+              <span class="status-badge is-warning" id="pricing-production-status">等待生产审批</span>
+              <input type="hidden" id="pricing-production-phrase" name="pricing-production-phrase">
+              <button class="button button-danger" type="button" id="pricing-production-action" disabled>
+                <i data-lucide="send" aria-hidden="true"></i>提交调价 Feed
+              </button>
             </div>
           </section>
         </section>
@@ -291,7 +576,7 @@
               <div class="table-panel jobs-table-panel">
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>创建时间</th><th>Feed ID</th><th>Marketplace</th><th class="align-right">SKU</th><th>状态</th></tr></thead>
+                    <thead><tr><th>创建时间</th><th>Feed ID</th><th>站点</th><th class="align-right">SKU</th><th>状态</th></tr></thead>
                     <tbody id="jobs-body"></tbody>
                   </table>
                 </div>
@@ -311,10 +596,11 @@
           </section>
         </section>
 
-        <section class="view" id="view-system" data-view="system">
+        <section class="view" id="view-settings" data-view="settings">
+          <div id="settings-auth-slot"></div>
           <section class="workspace-section no-top-border" aria-labelledby="system-heading">
             <div class="section-heading">
-              <div><span class="section-index">SYS</span><h2 id="system-heading">系统状态</h2></div>
+              <div><span class="section-index">SYS</span><h2 id="system-heading">运行状态</h2></div>
               <span class="section-state" id="system-health">检查中</span>
             </div>
 
@@ -327,10 +613,9 @@
               <div class="system-row"><span>版本</span><code id="system-version">—</code><strong>PowerShell local server</strong></div>
             </div>
 
-            <div class="endpoint-table">
-              <div><span>北美</span><code>sellingpartnerapi-na.amazon.com</code></div>
-              <div><span>欧洲</span><code>sellingpartnerapi-eu.amazon.com</code></div>
-              <div><span>远东</span><code>sellingpartnerapi-fe.amazon.com</code></div>
+            <div class="hint-panel compact">
+              <i data-lucide="route" aria-hidden="true"></i>
+              <span>API 路由由系统根据已授权站点自动选择，运营端无需选择区域。</span>
             </div>
           </section>
         </section>
@@ -338,18 +623,38 @@
     </div>
   </div>
 
-  <dialog id="submit-dialog" class="submit-dialog">
+  <dialog id="submit-dialog" class="submit-dialog" aria-labelledby="submit-dialog-title">
     <form method="dialog">
       <div class="dialog-icon" aria-hidden="true"><i data-lucide="triangle-alert"></i></div>
-      <h2>确认提交库存 Feed</h2>
+      <h2 id="submit-dialog-title">确认提交库存 Feed</h2>
       <dl class="dialog-summary">
         <div><dt>店铺</dt><dd id="dialog-store">—</dd></div>
-        <div><dt>Marketplace</dt><dd id="dialog-marketplace">—</dd></div>
+        <div><dt>站点</dt><dd id="dialog-marketplace">—</dd></div>
+        <div><dt>提交授权</dt><dd id="dialog-auth-profile">—</dd></div>
         <div><dt>SKU</dt><dd id="dialog-rows">—</dd></div>
+        <div><dt>零库存</dt><dd id="dialog-zero">—</dd></div>
       </dl>
       <div class="dialog-actions">
         <button class="button" value="cancel">取消</button>
         <button class="button button-danger" type="button" id="confirm-submit-button"><i data-lucide="send" aria-hidden="true"></i>确认提交</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="pricing-action-dialog" class="submit-dialog" aria-labelledby="pricing-action-dialog-title">
+    <form method="dialog">
+      <div class="dialog-icon pricing-dialog-icon" aria-hidden="true"><i data-lucide="badge-dollar-sign"></i></div>
+      <h2 id="pricing-action-dialog-title">确认调价操作</h2>
+      <dl class="dialog-summary">
+        <div><dt>店铺</dt><dd id="pricing-dialog-store">—</dd></div>
+        <div><dt>站点</dt><dd id="pricing-dialog-marketplace">—</dd></div>
+        <div><dt>方向</dt><dd id="pricing-dialog-direction">—</dd></div>
+        <div><dt>SKU</dt><dd id="pricing-dialog-rows">—</dd></div>
+        <div><dt>风险</dt><dd id="pricing-dialog-risk">—</dd></div>
+      </dl>
+      <div class="dialog-actions">
+        <button class="button" value="cancel">取消</button>
+        <button class="button button-danger" type="button" id="confirm-pricing-action"><i data-lucide="check" aria-hidden="true"></i>确认</button>
       </div>
     </form>
   </dialog>

@@ -1,0 +1,19 @@
+[Unit]
+Description=Klanata Amazon SP-API Compatibility Workstation
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker rm -f klanata-amazon
+ExecStart=/usr/bin/docker run --name klanata-amazon --network host --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --env HOME=/tmp --env XDG_CACHE_HOME=/tmp/cache --env XDG_CONFIG_HOME=/tmp/config --env XDG_DATA_HOME=/tmp/data --env KLANATA_CREDENTIAL_KEY_PATH=/run/secrets/workstation-store.key --env KLANATA_PUBLIC_ORIGIN=https://www.klanata.com --security-opt no-new-privileges --cap-drop ALL --memory 512m --cpus 1 --pids-limit 256 --mount type=bind,src=/var/lib/klanata-amazon/runtime,dst=/app/runtime --mount type=bind,src=/var/lib/klanata-amazon/input,dst=/data,readonly --mount type=bind,src=/etc/klanata/workstation-store.key,dst=/run/secrets/workstation-store.key,readonly klanata-amazon:current -Port 4319 -AllowedAmazonStoreName Carkee -AllowedAmazonSellerIds AC7OMGZBRADKF
+ExecStartPost=/usr/local/libexec/klanata-amazon-load-credentials.py
+ExecStop=/usr/bin/docker stop -t 20 klanata-amazon
+Restart=always
+RestartSec=5
+TimeoutStartSec=240
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

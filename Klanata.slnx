@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Klanata.Api/Klanata.Api.csproj" />
+    <Project Path="src/Klanata.Application/Klanata.Application.csproj" />
+    <Project Path="src/Klanata.Domain/Klanata.Domain.csproj" />
+    <Project Path="src/Klanata.Infrastructure/Klanata.Infrastructure.csproj" />
+    <Project Path="src/Klanata.Workers/Klanata.Workers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Klanata.Api.IntegrationTests/Klanata.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Klanata.Application.Tests/Klanata.Application.Tests.csproj" />
+    <Project Path="tests/Klanata.Domain.Tests/Klanata.Domain.Tests.csproj" />
+    <Project Path="tests/Klanata.Infrastructure.Tests/Klanata.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

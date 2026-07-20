@@ -1,0 +1,38 @@
+[Unit]
+Description=Klanata Inventory Workstation
+Documentation=https://localhost/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=klanata
+Group=klanata
+WorkingDirectory=/opt/klanata/current
+ExecStart=/opt/klanata/current/Klanata.Api --urls http://127.0.0.1:4318
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:4318
+Environment=Workstation__DataRoot=/var/lib/klanata
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/klanata
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,8 @@
 runtime/
+.agents/
+.playwright-mcp/
+output/
+test_file/
 .env
 .env.*
 *.secret
@@ -11,3 +15,22 @@ feed-input-*.json
 feed-processing-report-*.json
 server.json
 *.download
+
+# Production v2 build and runtime output
+**/bin/
+**/obj/
+**/node_modules/
+src/Klanata.Api/wwwroot/
+src/Klanata.Web/dist/
+runtime-v2/
+runtime-v3/
+runtime-v3-ui/
+runtime-v4/
+publish/
+TestResults/
+*.db
+*.db-shm
+*.db-wal
+*.log
+**/__pycache__/
+*.py[cod]
