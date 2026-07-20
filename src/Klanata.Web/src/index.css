@@ -22,8 +22,9 @@
   --mono: "Cascadia Mono", Consolas, monospace;
   color: var(--ink);
   background: var(--page);
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-  font-size: 13px;
+  font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -32,9 +33,9 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--page); }
-body { min-width: 320px; min-height: 100vh; margin: 0; }
+body { min-width: 320px; min-height: 100vh; min-height: 100dvh; margin: 0; }
 button, input, select { font: inherit; letter-spacing: 0; }
 button, select { cursor: pointer; }
 button:disabled, select:disabled { cursor: not-allowed; }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 code { font-family: var(--mono); }

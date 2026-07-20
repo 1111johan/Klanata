@@ -16,6 +16,7 @@ import {
   LoaderCircle,
   LockKeyhole,
   RefreshCw,
+  Settings2,
   ShieldCheck,
   SlidersHorizontal,
   Store,
@@ -74,6 +75,7 @@ type PricingSyncStatus = {
   blockReason?: string
   writeBlockReason?: string
   detail?: string
+  reportsExecutorAvailable?: boolean
 }
 
 type PricingRule = {
@@ -167,15 +169,16 @@ type PricingViewProps = {
   onContextChange: (value: string) => void
   bootstrapLoading: boolean
   bootstrapError: string
+  onOpenSystem?: () => void
 }
 
 const steps = [
-  { label: '商品同步', icon: DatabaseZap },
+  { label: '商品快照', icon: DatabaseZap },
   { label: '候选筛选', icon: Filter },
   { label: '调价规则', icon: SlidersHorizontal },
   { label: '差异审核', icon: FileCheck2 },
-  { label: '复核门禁', icon: ShieldCheck },
-  { label: '结果核验', icon: BadgeCheck },
+  { label: '复核记录', icon: ShieldCheck },
+  { label: '生产就绪', icon: BadgeCheck },
 ] as const
 
 const initialRule: RuleDraft = {
@@ -199,8 +202,8 @@ const initialConfirmations = {
 
 const initialValidation: ValidationState = {
   kind: 'idle',
-  title: '尚未执行生产校验',
-  detail: '复核记录完成后才能验证 Amazon 提交条件。',
+  title: '生产写入锁定',
+  detail: '当前版本支持规则模拟和草稿复核，尚未接通 Amazon 实时校验与价格写入。',
 }
 
 const snapshotFreshnessMs = 12 * 60 * 60 * 1000
@@ -299,7 +302,7 @@ function isSnapshotFresh(status: PricingSyncStatus | null, now: number) {
   return serverReady === true || expiresAt !== undefined
 }
 
-export default function PricingView({ contexts, selectedKey, onContextChange, bootstrapLoading, bootstrapError }: PricingViewProps) {
+export default function PricingView({ contexts, selectedKey, onContextChange, bootstrapLoading, bootstrapError, onOpenSystem }: PricingViewProps) {
   const selected = useMemo(() => contexts.find((item) => contextKey(item) === selectedKey), [contexts, selectedKey])
   const [csrfToken, setCsrfToken] = useState('')
   const [sessionError, setSessionError] = useState('')
@@ -400,6 +403,8 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
   const authReady = Boolean(selected?.capabilities.canReadListings && selected.capabilities.canReadPricing)
   const simulationReady = Boolean(authReady && selected?.capabilities.canSimulatePricing)
   const changeSetReady = Boolean(selected?.capabilities.canCreateDraftChangeSets)
+  const syncExecutorAvailable = syncStatus?.reportsExecutorAvailable === true
+  const productionValidationAvailable = Boolean(selected?.capabilities.canWritePrices)
   const allConfirmed = Object.values(confirmations).every(Boolean)
   const lockedInitiator = run?.initiatedBy || initiator
   const identityConflict = Boolean(lockedInitiator.trim() && approver.trim() && lockedInitiator.trim().toLocaleLowerCase() === approver.trim().toLocaleLowerCase())
@@ -524,8 +529,8 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
   }
 
   const validateChangeSet = async () => {
-    if (!changeSet || !isReviewRecorded(changeSet)) return
-    setValidation({ kind: 'running', title: '正在执行生产校验', detail: '核对快照、规则版本、锁和 Amazon 提交条件。' })
+    if (!changeSet || !isReviewRecorded(changeSet) || !productionValidationAvailable) return
+    setValidation({ kind: 'running', title: '正在检查生产条件…', detail: '核对快照、规则版本、锁和 Amazon 提交条件。' })
     setActionError('')
     try {
       const result = await postJson<{ title?: string; detail?: string; state?: string; verified?: boolean }>(`/api/v4/pricing/change-sets/${encodeURIComponent(changeSet.id)}/validate`, csrfToken, {})
@@ -564,8 +569,8 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
       <section className="pricing-context" aria-label="当前调价上下文">
         <div className="pricing-context-select">
           <label htmlFor="pricing-context">Carkee 站点</label>
-          <select id="pricing-context" value={selectedKey} onChange={(event) => onContextChange(event.target.value)} disabled={!contexts.length || bootstrapLoading || contextLocked}>
-            {!contexts.length ? <option value="">等待 Amazon 授权</option> : null}
+          <select id="pricing-context" name="pricingContext" autoComplete="off" value={selectedKey} onChange={(event) => onContextChange(event.target.value)} disabled={!contexts.length || bootstrapLoading || contextLocked}>
+            {!contexts.length ? <option value="">{bootstrapLoading ? '正在读取 Carkee 授权…' : 'Carkee 尚未连接'}</option> : null}
             {contexts.map((context) => <option key={contextKey(context)} value={contextKey(context)}>{context.sellerName} · {context.marketplaceName}</option>)}
           </select>
         </div>
@@ -576,11 +581,34 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
 
       <main className="main-content pricing-main">
         <header className="pricing-heading">
-          <div><span className="eyebrow">API-NATIVE PRICING</span><h1>智能调价</h1><p>一次任务只绑定一个店铺和一个站点，企业价固定不修改。</p></div>
+          <div><h1>智能调价工作台</h1><p>一次任务绑定一个 Carkee 站点；当前仅生成和复核草稿，不会向 Amazon 写入价格。</p></div>
           <div className="pricing-run-id"><span>当前任务</span><strong>{run?.runNumber || '未创建'}</strong>{run ? <button type="button" disabled={operationInFlight} onClick={resetPricingFlow}>新建任务</button> : null}</div>
         </header>
 
         {bootstrapError || sessionError ? <div className="pricing-alert is-danger" role="alert"><CircleAlert aria-hidden="true" /><div><strong>调价操作已阻止</strong><span>{bootstrapError || sessionError}</span></div></div> : null}
+
+        {!contexts.length ? (
+          <section className="pricing-empty-state" aria-labelledby="pricing-empty-title">
+            <Store aria-hidden="true" />
+            <div>
+              <span className="pricing-readiness">授权上下文未就绪</span>
+              <h2 id="pricing-empty-title">连接 Carkee 后开始调价</h2>
+              <p>V4 尚未读取到 Carkee 的 Seller、Marketplace 和加密授权。先在系统设置完成授权迁移，再重新加载此页面。</p>
+              <div className="pricing-readiness" role="status">
+                <strong>当前不可执行</strong>
+                <span>商品同步、规则模拟、差异复核和 Amazon 价格写入</span>
+              </div>
+              <div className="pricing-empty-actions">
+                <button className="primary-action" type="button" onClick={onOpenSystem}><Settings2 aria-hidden="true" />打开系统设置</button>
+                <button className="secondary-action" type="button" onClick={() => window.location.reload()}><RefreshCw aria-hidden="true" />重新加载</button>
+              </div>
+            </div>
+          </section>
+        ) : <>
+        <div className={`write-lock-banner ${productionValidationAvailable ? 'is-ready' : ''}`} role="status">
+          <LockKeyhole aria-hidden="true" />
+          <div><strong>{productionValidationAvailable ? '生产校验能力已声明' : 'Amazon 生产写入锁定'}</strong><span>{productionValidationAvailable ? '仍需通过实时校验后才能进入提交。' : selected?.capabilities.writeBlockReason || 'Reports 同步、实时校验和价格提交尚未接通。'}</span></div>
+        </div>
 
         <nav className="pricing-steps" aria-label="调价流程">
           {steps.map(({ label, icon: Icon }, index) => {
@@ -592,11 +620,12 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
         <section className="pricing-stage">
           {activeStep === 0 ? (
             <div className="stage-layout is-sync">
-              <div className="stage-copy"><span className="stage-number">01</span><div><h2>从 Amazon 同步最新商品</h2><p>系统直接读取 Listing、价格、库存和配送方式，不再要求上传 Excel 或 TXT。</p></div></div>
+              <div className="stage-copy"><span className="stage-number">01</span><div><h2>准备 Amazon 商品快照</h2><p>调价必须基于同一批次的 Listing、价格、库存和配送方式；没有新鲜快照时，流程会停止。</p></div></div>
               <div className="sync-panel">
-                <div className="sync-state"><DatabaseZap aria-hidden="true" /><div><span>当前快照</span><strong>{syncStatus ? `${listingCount} 条 Listing` : '尚未读取'}</strong><small>{snapshotTime ? `同步于 ${formatDate(snapshotTime)}` : '同步失败时会保留上一次可用快照'}</small></div></div>
+                <div className="sync-state"><DatabaseZap aria-hidden="true" /><div><span>当前快照</span><strong>{syncStatus ? `${listingCount} 条 Listing` : '正在读取状态…'}</strong><small>{snapshotTime ? `同步于 ${formatDate(snapshotTime)}` : '只有后端确认完整的新鲜快照才可继续'}</small></div></div>
+                {syncStatus && !syncExecutorAvailable ? <div className="stage-block" role="status"><LockKeyhole aria-hidden="true" /><div><strong translate="no">REPORTS_EXECUTOR_UNAVAILABLE</strong><span>Amazon Reports 商品同步执行器尚未接通。当前只能使用数据库中已有且仍有效的快照。</span><small>同步按钮已锁定，不会发出必然失败的生产请求。</small></div></div> : null}
                 {syncError || (syncStatus && !snapshotFresh && syncStatus.detail) ? <div className="stage-block" role="alert"><CircleAlert aria-hidden="true" /><div><strong>{syncErrorCode || syncStatus?.state || 'Amazon 同步不可用'}</strong><span>{syncError || syncStatus?.detail}</span><small>未生成成功状态，上一次快照保持不变。</small></div></div> : null}
-                <button className="primary-action" type="button" disabled={!selected || !csrfToken || syncing || !authReady} onClick={() => void syncProducts()}>{syncing ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}{syncing ? '正在同步' : '同步 Amazon 商品'}</button>
+                <button className="primary-action" type="button" disabled={!selected || !csrfToken || syncing || !authReady || !syncExecutorAvailable} onClick={() => void syncProducts()}>{syncing ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : syncExecutorAvailable ? <RefreshCw aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{syncing ? '正在同步…' : syncExecutorAvailable ? '同步 Amazon 商品' : '同步执行器未接通'}</button>
                 {snapshotFresh ? <button className="text-action" type="button" onClick={() => setActiveStep(1)}>使用当前快照继续<ArrowRight aria-hidden="true" /></button> : null}
               </div>
             </div>
@@ -608,7 +637,7 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
               <div className="eligibility-grid">
                 <article><CircleCheck aria-hidden="true" /><h3>候选条件</h3><p>在线、可售、MFN 自配送、库存大于 0、价格数据新鲜。</p></article>
                 <article><LockKeyhole aria-hidden="true" /><h3>快照筛选</h3><p>排除 FBA、同 ASIN 存在 FBA、停售或抑制、零库存等不符合纯 FBM 条件的 Listing。</p></article>
-                <article><FileCheck2 aria-hidden="true" /><h3>提交门禁</h3><p>自动调价状态、最新价格与并发冲突将在生产提交前实时核验；每条已知排除原因均保留。</p></article>
+                 <article><FileCheck2 aria-hidden="true" /><h3>提交门禁</h3><p>每条排除原因都会保存；实时价格、自动调价状态和并发冲突能力未接通前，生产写入始终锁定。</p></article>
               </div>
               <div className="stage-footer"><span>快照 v{latestVersion ?? '--'} · {listingCount} 条商品</span><button className="primary-action" type="button" onClick={() => setActiveStep(2)}>配置调价规则<ArrowRight aria-hidden="true" /></button></div>
             </div>
@@ -618,14 +647,14 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
             <div className="stage-layout">
               <div className="stage-copy"><span className="stage-number">03</span><div><h2>配置版本化调价规则</h2><p>以 {selected?.currencyCode || '站点币种'} 100 为分界分别计算，并同时受两类幅度上限保护。</p></div></div>
               <div className="rule-form">
-                <label className="field is-wide"><span>规则名称</span><input value={rule.name} onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))} /></label>
-                <label className="field"><span>任务发起人</span><input value={initiator} onChange={(event) => setInitiator(event.target.value)} placeholder="输入姓名或工号" /></label>
+                <label className="field is-wide"><span>规则名称</span><input name="ruleName" autoComplete="off" maxLength={120} value={rule.name} onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))} /></label>
+                <label className="field"><span>任务发起人</span><input name="initiator" autoComplete="off" spellCheck={false} maxLength={100} aria-describedby="initiator-help" value={initiator} onChange={(event) => setInitiator(event.target.value)} placeholder="例如：张三 / OP-1024…" /><small id="initiator-help" className="field-help">用于草稿审计，不代表已认证身份。</small></label>
                 <fieldset className="segmented-field"><legend>调整方向</legend><div><button type="button" aria-pressed={rule.direction === 'INCREASE'} className={rule.direction === 'INCREASE' ? 'is-selected' : ''} onClick={() => setRule((current) => ({ ...current, direction: 'INCREASE' }))}><ArrowUp aria-hidden="true" />涨价</button><button type="button" aria-pressed={rule.direction === 'DECREASE'} className={rule.direction === 'DECREASE' ? 'is-selected' : ''} onClick={() => setRule((current) => ({ ...current, direction: 'DECREASE' }))}><ArrowDown aria-hidden="true" />降价</button></div></fieldset>
-                <label className="field"><span>价格分界</span><div className="input-suffix"><input type="number" min="0.01" step="0.01" value={rule.threshold} onChange={(event) => setRule((current) => ({ ...current, threshold: event.target.value }))} /><span>{selected?.currencyCode || '币种'}</span></div></label>
-                <div className="band-rule"><div><strong>小于等于 {rule.threshold || '100'}</strong><small>较低售价区间</small></div><select aria-label="低价区间调整方式" value={rule.lowerType} onChange={(event) => setRule((current) => ({ ...current, lowerType: event.target.value as AdjustmentType }))}><option value="FIXED_AMOUNT">固定金额</option><option value="PERCENTAGE">百分比</option></select><div className="input-suffix"><input aria-label="低价区间调整值" type="number" min="0.01" step="0.01" value={rule.lowerValue} onChange={(event) => setRule((current) => ({ ...current, lowerValue: event.target.value }))} /><span>{rule.lowerType === 'PERCENTAGE' ? '%' : selected?.currencyCode || '金额'}</span></div></div>
-                <div className="band-rule"><div><strong>大于 {rule.threshold || '100'}</strong><small>较高售价区间</small></div><select aria-label="高价区间调整方式" value={rule.upperType} onChange={(event) => setRule((current) => ({ ...current, upperType: event.target.value as AdjustmentType }))}><option value="FIXED_AMOUNT">固定金额</option><option value="PERCENTAGE">百分比</option></select><div className="input-suffix"><input aria-label="高价区间调整值" type="number" min="0.01" step="0.01" value={rule.upperValue} onChange={(event) => setRule((current) => ({ ...current, upperValue: event.target.value }))} /><span>{rule.upperType === 'PERCENTAGE' ? '%' : selected?.currencyCode || '金额'}</span></div></div>
-                <label className="field"><span>单次绝对上限</span><div className="input-suffix"><input type="number" min="0" step="0.01" value={rule.absoluteCap} onChange={(event) => setRule((current) => ({ ...current, absoluteCap: event.target.value }))} /><span>{selected?.currencyCode || '金额'}</span></div></label>
-                <label className="field"><span>单次百分比上限</span><div className="input-suffix"><input type="number" min="0" step="0.01" value={rule.percentageCap} onChange={(event) => setRule((current) => ({ ...current, percentageCap: event.target.value }))} /><span>%</span></div></label>
+                <label className="field"><span>价格分界</span><div className="input-suffix"><input name="threshold" autoComplete="off" inputMode="decimal" type="number" min="0.01" step="0.01" value={rule.threshold} onChange={(event) => setRule((current) => ({ ...current, threshold: event.target.value }))} /><span>{selected?.currencyCode || '币种'}</span></div></label>
+                <div className="band-rule"><div><strong>小于等于 {rule.threshold || '100'}</strong><small>较低售价区间</small></div><select name="lowerAdjustmentType" autoComplete="off" aria-label="低价区间调整方式" value={rule.lowerType} onChange={(event) => setRule((current) => ({ ...current, lowerType: event.target.value as AdjustmentType }))}><option value="FIXED_AMOUNT">固定金额</option><option value="PERCENTAGE">百分比</option></select><div className="input-suffix"><input name="lowerAdjustmentValue" autoComplete="off" inputMode="decimal" aria-label="低价区间调整值" type="number" min="0.01" step="0.01" value={rule.lowerValue} onChange={(event) => setRule((current) => ({ ...current, lowerValue: event.target.value }))} /><span>{rule.lowerType === 'PERCENTAGE' ? '%' : selected?.currencyCode || '金额'}</span></div></div>
+                <div className="band-rule"><div><strong>大于 {rule.threshold || '100'}</strong><small>较高售价区间</small></div><select name="upperAdjustmentType" autoComplete="off" aria-label="高价区间调整方式" value={rule.upperType} onChange={(event) => setRule((current) => ({ ...current, upperType: event.target.value as AdjustmentType }))}><option value="FIXED_AMOUNT">固定金额</option><option value="PERCENTAGE">百分比</option></select><div className="input-suffix"><input name="upperAdjustmentValue" autoComplete="off" inputMode="decimal" aria-label="高价区间调整值" type="number" min="0.01" step="0.01" value={rule.upperValue} onChange={(event) => setRule((current) => ({ ...current, upperValue: event.target.value }))} /><span>{rule.upperType === 'PERCENTAGE' ? '%' : selected?.currencyCode || '金额'}</span></div></div>
+                <label className="field"><span>单次绝对上限</span><div className="input-suffix"><input name="absoluteChangeCap" autoComplete="off" inputMode="decimal" type="number" min="0" step="0.01" value={rule.absoluteCap} onChange={(event) => setRule((current) => ({ ...current, absoluteCap: event.target.value }))} /><span>{selected?.currencyCode || '金额'}</span></div></label>
+                <label className="field"><span>单次百分比上限</span><div className="input-suffix"><input name="percentageChangeCap" autoComplete="off" inputMode="decimal" type="number" min="0" step="0.01" value={rule.percentageCap} onChange={(event) => setRule((current) => ({ ...current, percentageCap: event.target.value }))} /><span>%</span></div></label>
                 <div className="b2b-lock"><LockKeyhole aria-hidden="true" /><div><span>企业价格策略</span><strong>不修改</strong></div></div>
               </div>
               {actionError ? <div className="pricing-alert is-danger" role="alert"><CircleAlert aria-hidden="true" /><div><strong>无法创建调价预览</strong><span>{actionError}</span></div></div> : null}
@@ -638,7 +667,23 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
               <div className="stage-copy"><span className="stage-number">04</span><div><h2>逐 SKU 审核价格差异</h2><p>报告快照价、目标价、幅度、排除原因和风险在同一张表中核对；提交前还会核验最新价。</p></div></div>
               {run ? <>
                 <div className="run-summary"><div><span>总商品</span><strong>{run.summary.total}</strong></div><div className="is-green"><span>可调价</span><strong>{run.summary.eligible}</strong></div><div className="is-amber"><span>已排除</span><strong>{run.summary.excluded}</strong></div><div><span>规则版本</span><strong>v{run.rule.version}</strong></div></div>
-                <div className="pricing-table-wrap"><table className="pricing-table"><thead><tr><th>商品 / SKU</th><th>状态</th><th className="is-numeric">报告快照价</th><th className="is-numeric">目标价</th><th className="is-numeric">差额</th><th className="is-numeric">幅度</th><th>排除 / 风险</th></tr></thead><tbody>{visibleRunItems.map((item) => <tr key={item.id || item.sku} className={!item.eligible ? 'is-excluded' : ''}><td><strong>{item.title || item.sku}</strong><span><code>{item.sku}</code>{item.asin ? ` · ${item.asin}` : ''}</span></td><td><span className={`eligibility ${item.eligible ? 'is-eligible' : ''}`}>{item.eligible ? '候选' : '排除'}</span></td><td className="is-numeric">{formatMoney(item.currentPrice, item.currencyCode)}</td><td className="is-numeric"><strong>{formatMoney(item.targetPrice, item.currencyCode)}</strong></td><td className={`is-numeric ${item.priceChange == null ? '' : item.priceChange >= 0 ? 'delta-up' : 'delta-down'}`}>{item.priceChange == null ? '--' : `${item.priceChange >= 0 ? '+' : ''}${item.priceChange.toFixed(2)}`}</td><td className="is-numeric">{item.priceChangePercent == null ? '--' : `${item.priceChangePercent >= 0 ? '+' : ''}${item.priceChangePercent.toFixed(2)}`}</td><td><span className={item.eligible ? 'risk-clear' : 'risk-reason'}>{item.eligible ? '待提交门禁核验' : item.exclusionReasons.join('；') || item.exclusionCodes.join(', ') || '不符合纯 FBM 条件'}</span></td></tr>)}</tbody></table></div>
+                <div className="pricing-table-wrap">
+                  <table className="pricing-table" aria-label="SKU 调价差异">
+                    <thead><tr><th>商品 / SKU</th><th>状态</th><th className="is-numeric">报告快照价</th><th className="is-numeric">目标价</th><th className="is-numeric">差额</th><th className="is-numeric">幅度</th><th>排除 / 风险</th></tr></thead>
+                    <tbody>{visibleRunItems.map((item) => {
+                      const risk = item.eligible ? '待提交门禁核验' : item.exclusionReasons.join('；') || item.exclusionCodes.join(', ') || '不符合纯 FBM 条件'
+                      return <tr key={item.id || item.sku} className={!item.eligible ? 'is-excluded' : ''}>
+                        <td data-label="商品 / SKU"><strong title={item.title || item.sku}>{item.title || item.sku}</strong><span title={`${item.sku}${item.asin ? ` · ${item.asin}` : ''}`}><code translate="no">{item.sku}</code>{item.asin ? <> · <code translate="no">{item.asin}</code></> : null}</span></td>
+                        <td data-label="状态"><span className={`eligibility ${item.eligible ? 'is-eligible' : ''}`}>{item.eligible ? '候选' : '排除'}</span></td>
+                        <td data-label="报告快照价" className="is-numeric">{formatMoney(item.currentPrice, item.currencyCode)}</td>
+                        <td data-label="目标价" className="is-numeric"><strong>{formatMoney(item.targetPrice, item.currencyCode)}</strong></td>
+                        <td data-label="差额" className={`is-numeric ${item.priceChange == null ? '' : item.priceChange >= 0 ? 'delta-up' : 'delta-down'}`}>{item.priceChange == null ? '--' : `${item.priceChange >= 0 ? '+' : ''}${item.priceChange.toFixed(2)}`}</td>
+                        <td data-label="幅度" className="is-numeric">{item.priceChangePercent == null ? '--' : `${item.priceChangePercent >= 0 ? '+' : ''}${item.priceChangePercent.toFixed(2)}%`}</td>
+                        <td data-label="排除 / 风险"><span className={item.eligible ? 'risk-clear' : 'risk-reason'} title={risk}>{risk}</span></td>
+                      </tr>
+                    })}</tbody>
+                  </table>
+                </div>
                 {itemPageCount > 1 ? <div className="pagination pricing-pagination" aria-label="SKU 差异分页"><span>第 {currentItemPage} / {itemPageCount} 页 · 共 {run.items.length} 条</span><div><button type="button" aria-label="上一页" title="上一页" disabled={currentItemPage <= 1} onClick={() => setItemPage((page) => Math.max(1, page - 1))}><ChevronLeft aria-hidden="true" /></button><button type="button" aria-label="下一页" title="下一页" disabled={currentItemPage >= itemPageCount} onClick={() => setItemPage((page) => Math.min(itemPageCount, page + 1))}><ChevronRight aria-hidden="true" /></button></div></div> : null}
               </> : <div className="stage-empty"><FileCheck2 aria-hidden="true" /><strong>尚未生成差异</strong><span>返回调价规则创建预览。</span></div>}
               {actionError ? <div className="pricing-alert is-danger" role="alert"><CircleAlert aria-hidden="true" /><div><strong>变更集创建失败</strong><span>{actionError}</span></div></div> : null}
@@ -648,33 +693,34 @@ export default function PricingView({ contexts, selectedKey, onContextChange, bo
 
           {activeStep === 4 ? (
             <div className="stage-layout">
-              <div className="stage-copy"><span className="stage-number">05</span><div><h2>记录异人复核后进入生产校验</h2><p>当前姓名仅为未认证标签，不构成正式双人审批；真实身份/RBAC 接入前生产写入保持锁定。</p></div></div>
+              <div className="stage-copy"><span className="stage-number">05</span><div><h2>记录异人复核草稿</h2><p>当前姓名仅为未认证标签，不构成正式双人审批；真实身份与 RBAC 接入前，记录不会解锁 Amazon 写入。</p></div></div>
               <div className="approval-layout">
-                <div className="approval-identity"><div><span>发起人标签</span><strong>{run?.initiatedBy || '--'}</strong></div><ArrowRight aria-hidden="true" /><label><span>复核人标签</span><input value={approver} onChange={(event) => setApprover(event.target.value)} placeholder="必须与发起人标签不同" /></label>{identityConflict ? <small role="alert">复核人标签不能与发起人相同</small> : null}</div>
+                <div className="approval-identity"><div><span>发起人标签</span><strong>{run?.initiatedBy || '--'}</strong></div><ArrowRight aria-hidden="true" /><label><span>复核人标签</span><input name="approver" autoComplete="off" spellCheck={false} maxLength={100} aria-describedby={identityConflict ? 'approver-error' : undefined} value={approver} onChange={(event) => setApprover(event.target.value)} placeholder="例如：李四 / OP-2048…" /></label>{identityConflict ? <small id="approver-error" role="alert">复核人标签不能与发起人相同</small> : null}</div>
                 <fieldset className="approval-checks"><legend>人工复核确认</legend>
-                  <label><input type="checkbox" checked={confirmations.sellerMarketplace} onChange={(event) => setConfirmations((current) => ({ ...current, sellerMarketplace: event.target.checked }))} /><span><strong>店铺与站点正确</strong><small>{runContext?.sellerName} · {runContext?.marketplaceName}</small></span></label>
-                  <label><input type="checkbox" checked={confirmations.ruleVersion} onChange={(event) => setConfirmations((current) => ({ ...current, ruleVersion: event.target.checked }))} /><span><strong>规则版本已锁定</strong><small>{run ? `${run.rule.name} · v${run.rule.version}` : '--'}</small></span></label>
-                  <label><input type="checkbox" checked={confirmations.anomaliesReviewed} onChange={(event) => setConfirmations((current) => ({ ...current, anomaliesReviewed: event.target.checked }))} /><span><strong>差异与异常已逐项审核</strong><small>{run?.summary.eligible ?? 0} 条候选，{run?.summary.excluded ?? 0} 条排除</small></span></label>
-                  <label><input type="checkbox" checked={confirmations.amazonAcceptance} onChange={(event) => setConfirmations((current) => ({ ...current, amazonAcceptance: event.target.checked }))} /><span><strong>理解 Amazon 接收不等于生效</strong><small>最终成功以回读目标价一致为准</small></span></label>
+                  <label><input name="confirmSellerMarketplace" type="checkbox" checked={confirmations.sellerMarketplace} onChange={(event) => setConfirmations((current) => ({ ...current, sellerMarketplace: event.target.checked }))} /><span><strong>店铺与站点正确</strong><small>{runContext?.sellerName} · {runContext?.marketplaceName}</small></span></label>
+                  <label><input name="confirmRuleVersion" type="checkbox" checked={confirmations.ruleVersion} onChange={(event) => setConfirmations((current) => ({ ...current, ruleVersion: event.target.checked }))} /><span><strong>规则版本已锁定</strong><small>{run ? `${run.rule.name} · v${run.rule.version}` : '--'}</small></span></label>
+                  <label><input name="confirmAnomaliesReviewed" type="checkbox" checked={confirmations.anomaliesReviewed} onChange={(event) => setConfirmations((current) => ({ ...current, anomaliesReviewed: event.target.checked }))} /><span><strong>差异与异常已逐项审核</strong><small>{run?.summary.eligible ?? 0} 条候选，{run?.summary.excluded ?? 0} 条排除</small></span></label>
+                  <label><input name="confirmAmazonAcceptance" type="checkbox" checked={confirmations.amazonAcceptance} onChange={(event) => setConfirmations((current) => ({ ...current, amazonAcceptance: event.target.checked }))} /><span><strong>理解 Amazon 接收不等于生效</strong><small>最终成功以回读目标价一致为准</small></span></label>
                 </fieldset>
               </div>
               {actionError ? <div className="pricing-alert is-danger" role="alert"><CircleAlert aria-hidden="true" /><div><strong>复核未完成</strong><span>{actionError}</span></div></div> : null}
-              <div className="stage-footer"><span>变更集 {changeSet?.id ? changeSet.id.slice(0, 12) : '--'} · {changeSet?.itemCount ?? 0} 个 SKU</span><button className="primary-action" type="button" disabled={!changeSet || reviewRecorded || !approver.trim() || identityConflict || !allConfirmed || action === 'approve'} onClick={() => void approveChangeSet()}>{action === 'approve' ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}记录复核并进入校验</button></div>
+               <div className="stage-footer"><span>变更集 {changeSet?.id ? changeSet.id.slice(0, 12) : '--'} · {changeSet?.itemCount ?? 0} 个 SKU</span><button className="primary-action" type="button" disabled={!changeSet || reviewRecorded || !approver.trim() || identityConflict || !allConfirmed || action === 'approve'} onClick={() => void approveChangeSet()}>{action === 'approve' ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}记录复核草稿</button></div>
             </div>
           ) : null}
 
           {activeStep === 5 ? (
             <div className="stage-layout is-verification">
-              <div className="stage-copy"><span className="stage-number">06</span><div><h2>验证 Amazon 最终结果</h2><p>当前报告快照不是实时价格；提交前最新价尚未核验。接口接收、处理完成与价格回读是三个独立状态，只有回读一致才算成功。</p></div></div>
+              <div className="stage-copy"><span className="stage-number">06</span><div><h2>检查生产就绪状态</h2><p>当前版本没有 Amazon 价格提交接口，也没有实时价格冲突校验与回读。只有这些能力接通并通过检查后，系统才允许生产提交。</p></div></div>
               <div className={`verification-state is-${validation.kind}`} role="status" aria-live="polite" aria-atomic="true">
                 {validation.kind === 'running' ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : validation.kind === 'passed' ? <CircleCheck aria-hidden="true" /> : validation.kind === 'blocked' ? <CircleAlert aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
-                <div><span>{validation.code || 'PRODUCTION VALIDATION'}</span><h3>{validation.title}</h3><p>{validation.detail}</p></div>
+                <div><span translate="no">{validation.code || 'PRODUCTION WRITE LOCKED'}</span><h3>{validation.title}</h3><p>{validation.detail}</p></div>
               </div>
-              <div className="verification-timeline" aria-label="生产结果阶段"><div className={changeSet ? 'is-reached' : ''}><span>1</span><strong>复核记录</strong><small>{reviewRecorded ? '已记录' : '等待'}</small></div><div className={reviewRecorded ? 'is-reached' : ''}><span>2</span><strong>生产校验</strong><small>{validation.kind === 'idle' ? '等待' : validation.kind === 'passed' ? '通过' : validation.kind === 'blocked' ? '已阻止' : '执行中'}</small></div><div><span>3</span><strong>Amazon 接收</strong><small>尚未提交</small></div><div><span>4</span><strong>价格回读</strong><small>尚未核验</small></div></div>
-              <div className="stage-footer"><span>当前页面不会把复核标签、阻断或接口接收显示为调价成功。</span><button className="primary-action" type="button" disabled={!reviewRecorded || validation.kind === 'running'} onClick={() => void validateChangeSet()}><ShieldCheck aria-hidden="true" />执行生产校验</button></div>
+              <div className="verification-timeline" aria-label="生产结果阶段"><div className={changeSet ? 'is-reached' : ''}><span>1</span><strong>复核记录</strong><small>{reviewRecorded ? '已记录' : '等待'}</small></div><div className={reviewRecorded && productionValidationAvailable ? 'is-reached' : ''}><span>2</span><strong>生产校验</strong><small>{!productionValidationAvailable ? '未接通' : validation.kind === 'idle' ? '等待' : validation.kind === 'passed' ? '通过' : validation.kind === 'blocked' ? '已阻止' : '执行中'}</small></div><div><span>3</span><strong>Amazon 接收</strong><small>未接通</small></div><div><span>4</span><strong>价格回读</strong><small>未接通</small></div></div>
+              <div className="stage-footer"><span>{productionValidationAvailable ? '生产校验仍会失败关闭，只有明确 READY_TO_SUBMIT 才算通过。' : '生产写入能力未接通，调价流程停留在已复核草稿。'}</span><button className="primary-action" type="button" disabled={!reviewRecorded || !productionValidationAvailable || validation.kind === 'running'} onClick={() => void validateChangeSet()}><ShieldCheck aria-hidden="true" />{productionValidationAvailable ? '检查生产就绪条件' : '生产写入未接通'}</button></div>
             </div>
           ) : null}
         </section>
+        </>}
       </main>
     </div>
   )

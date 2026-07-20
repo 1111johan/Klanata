@@ -214,6 +214,17 @@ function useHashView() {
   return [view, navigate] as const
 }
 
+function PrimaryNavigation({ view, className = '', label }: { view: ViewName; className?: string; label: string }) {
+  return (
+    <nav className={`primary-navigation ${className}`.trim()} aria-label={label}>
+      <a className="nav-item" href="#catalog" aria-current={view === 'catalog' ? 'page' : undefined}><LayoutList aria-hidden="true" /><span>商品中心</span></a>
+      <span className="nav-item is-disabled" aria-disabled="true" title="变更集将在后续安全阶段开放"><Archive aria-hidden="true" /><span>变更集</span><LockKeyhole className="nav-lock" aria-hidden="true" /></span>
+      <a className="nav-item" href="#pricing" aria-current={view === 'pricing' ? 'page' : undefined}><SlidersHorizontal aria-hidden="true" /><span>智能调价</span></a>
+      <a className="nav-item" href="#system" aria-current={view === 'system' ? 'page' : undefined}><Activity aria-hidden="true" /><span>系统状态</span></a>
+    </nav>
+  )
+}
+
 function HealthBadge({ status }: { status: ComponentHealth['status'] }) {
   return <span className={`health-badge is-${status}`}>{healthLabels[status]}</span>
 }
@@ -529,14 +540,9 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar desktop-sidebar">
         <div className="brand"><span className="brand-mark">K</span><div><strong>Klanata</strong><span>Amazon Operations</span></div></div>
-        <nav aria-label="主导航">
-          <button className={view === 'catalog' ? 'is-active' : ''} type="button" onClick={() => navigate('catalog')}><LayoutList aria-hidden="true" /><span>商品中心</span></button>
-          <button type="button" disabled title="变更集将在后续安全阶段开放"><Archive aria-hidden="true" /><span>变更集</span><LockKeyhole className="nav-lock" aria-hidden="true" /></button>
-          <button className={view === 'pricing' ? 'is-active' : ''} type="button" onClick={() => navigate('pricing')}><SlidersHorizontal aria-hidden="true" /><span>智能调价</span></button>
-          <button className={view === 'system' ? 'is-active' : ''} type="button" onClick={() => navigate('system')}><Activity aria-hidden="true" /><span>系统状态</span></button>
-        </nav>
+        <PrimaryNavigation view={view} label="主导航" />
         <div className="sidebar-status"><span className={`status-dot is-${overallStatus}`} aria-hidden="true" /><div><strong>{overallStatus === 'healthy' ? '平台正常' : overallStatus === 'unhealthy' ? '平台异常' : '平台需关注'}</strong><span>{version?.phase || '正在读取运行状态'}</span></div></div>
       </aside>
 
@@ -545,11 +551,12 @@ function App() {
         {view === 'catalog' ? (
           <CatalogView contexts={contexts} selectedKey={selectedKey} onContextChange={changeContext} catalog={catalog} loading={catalogLoading || bootstrapLoading} error={catalogError || bootstrapError} searchDraft={searchDraft} search={search} filters={filters} page={page} selectedSku={selectedSku} detail={detail} detailLoading={detailLoading} onSearchDraftChange={setSearchDraft} onSearch={submitSearch} onFilterChange={changeFilter} onReset={resetFilters} onRefresh={() => setRefreshSequence((value) => value + 1)} onPageChange={setPage} onSelectSku={setSelectedSku} onCloseDetail={() => setSelectedSku('')} onOpenSystem={() => navigate('system')} />
         ) : view === 'pricing' ? (
-          <PricingView contexts={contexts} selectedKey={selectedKey} onContextChange={changeContext} bootstrapLoading={bootstrapLoading} bootstrapError={bootstrapError} />
+          <PricingView contexts={contexts} selectedKey={selectedKey} onContextChange={changeContext} bootstrapLoading={bootstrapLoading} bootstrapError={bootstrapError} onOpenSystem={() => navigate('system')} />
         ) : (
           <SystemView health={health} version={version} loading={bootstrapLoading} error={bootstrapError} onRefresh={() => void loadBootstrap()} />
         )}
       </div>
+      <PrimaryNavigation view={view} className="mobile-navigation" label="移动主导航" />
     </div>
   )
 }
